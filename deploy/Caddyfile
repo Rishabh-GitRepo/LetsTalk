@@ -1,0 +1,13 @@
+yourdomain.com {
+  handle /api/* {
+    reverse_proxy gateway:3000
+  }
+
+  handle /auth/* {
+    reverse_proxy gateway:3000
+  }
+
+  handle {
+    reverse_proxy web:80
+  }
+}

@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test": "vitest run",
@@ -20,15 +21,19 @@
     "dotenv": "^18.0.3",
     "express": "^5.2.1",
     "jose": "^6.2.12",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "pg": "^8.23.0",
     "redis": "^6.2.1"
   },
   "devDependencies": {
-    "@types/cookie-parser": "^1.4.7",
-    "@types/express": "^5.0.6",
-    "@types/node": "^26.6.2",
-    "prisma": "^7.10.0",
-    "tsx": "^4.23.15",
-    "vitest": "^5.0.1"
-  }
+  "@types/cookie-parser": "^1.4.7",
+  "@types/express": "^5.0.6",
+  "@types/node": "^26.6.2",
+  "@types/passport": "^1.0.17",
+  "@types/passport-google-oauth20": "^2.0.17",
+  "prisma": "^7.10.0",
+  "tsx": "^4.23.15",
+  "vitest": "^5.0.1"
+}
 }

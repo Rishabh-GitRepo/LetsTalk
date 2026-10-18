@@ -1,68 +1,88 @@
 import express from "express";
-// pg does not provide TypeScript declarations in the installed package.
-// @ts-expect-error Missing declaration file for module "pg".
-import { Pool } from "pg";
-import { createClient } from "redis";
 import cors from "cors";
-
+import type { IncomingMessage } from "node:http";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
-const PORT = 3000;
 
+const PORT = 3000;
+const AUTH_SERVICE_URL = "http://localhost:3003";
+
+/*
+ * CORS
+ */
 app.use(
   cors({
     origin: "http://localhost:5173",
-  })
+    credentials: true,
+  }),
 );
 
-const pool = new Pool({
-  connectionString:
-    "postgresql://letstalk_user:letstalk_password@localhost:5433/letstalk_db",
-});
-
-const redis = createClient({
-  url: process.env.REDIS_URL ?? "redis://localhost:6380",
-});
-
-redis.on("error", (error) => {
-  console.error("Redis error:", error);
-});
-
-async function start() {
-  await redis.connect();
-
-  app.get("/health", async (_req, res) => {
-    let postgres = false;
-    let redisStatus = false;
-
-    try {
-      await pool.query("SELECT 1");
-      postgres = true;
-    } catch (error) {
-      console.error("Postgres health check failed:", error);
-    }
-
-    try {
-      redisStatus = (await redis.ping()) === "PONG";
-    } catch (error) {
-      console.error("Redis health check failed:", error);
-    }
-
-    const healthy = postgres && redisStatus;
-
-    res.status(healthy ? 200 : 503).json({
-      status: healthy ? "ok" : "error",
-      postgres,
-      redis: redisStatus,
-    });
+/*
+ * Gateway health
+ */
+app.get("/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "gateway",
   });
+});
 
-  app.listen(PORT, () => {
-    console.log(`Gateway running on http://localhost:${PORT}`);
-  });
-}
+/*
+ * AUTH PROXY
+ *
+ * IMPORTANT:
+ * Proxy comes BEFORE express.json()
+ */
+app.use(
+  "/auth",
+  createProxyMiddleware({
+    target: AUTH_SERVICE_URL,
+    changeOrigin: true,
 
-start().catch((error) => {
-  console.error("Failed to start gateway:", error);
-  process.exit(1);
+    on: {
+      proxyReq: (proxyReq, req: IncomingMessage) => {
+        console.log(
+          `[Gateway] ${req.method} ${req.url} -> ${AUTH_SERVICE_URL}`,
+        );
+      },
+
+      proxyRes: (proxyRes, req) => {
+        console.log(
+          `[Gateway] Auth response: ${proxyRes.statusCode} ${req.url}`,
+        );
+      },
+
+      error: (err, req, res) => {
+        console.error("[Gateway Proxy Error]", err);
+
+        const response = res as any;
+
+        if (response && !response.headersSent) {
+          response.statusCode = 502;
+          response.setHeader("Content-Type", "application/json");
+
+          response.end(
+            JSON.stringify({
+              message: "Auth service unavailable",
+            }),
+          );
+        }
+      },
+    },
+  }),
+);
+
+/*
+ * JSON parser
+ *
+ * Keep this AFTER proxy.
+ */
+app.use(express.json());
+
+/*
+ * Start Gateway
+ */
+app.listen(PORT, () => {
+  console.log(`Gateway running on http://localhost:${PORT}`);
 });

@@ -1,5 +1,9 @@
-const BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+
+type ApiErrorBody = {
+  message?: string;
+};
 
 export async function apiFetch<T>(
   path: string,
@@ -7,7 +11,7 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const token = localStorage.getItem("accessToken");
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -16,11 +20,14 @@ export async function apiFetch<T>(
         : {}),
       ...options.headers,
     },
+    credentials: "include",
   });
 
+  const body = (await response.json().catch(() => ({}))) as ApiErrorBody & T;
+
   if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+    throw new Error(body.message ?? `API error: ${response.status}`);
   }
 
-  return response.json() as Promise<T>;
+  return body;
 }
